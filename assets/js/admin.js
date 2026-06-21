@@ -25,9 +25,12 @@ onAuthStateChanged(auth, async user => {
     $("adminArea").classList.add("hidden");
     return;
   }
-  const adminSnap = await get(ref(db, `admins/${user.uid}`));
-  if(!adminSnap.val()){
-    $("loginFeedback").textContent = "Compte connecté, mais UID non autorisé dans /admins.";
+  const [adminsSnap, adminSnap] = await Promise.all([
+    get(ref(db, `admins/${user.uid}`)),
+    get(ref(db, `admin/${user.uid}`))
+  ]);
+  if(!adminsSnap.val() && !adminSnap.val()){
+    $("loginFeedback").textContent = "Compte connecté, mais UID non autorisé dans /admins ou /admin.";
     await signOut(auth);
     return;
   }
