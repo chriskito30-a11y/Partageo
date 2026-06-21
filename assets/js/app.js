@@ -1,12 +1,8 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getDatabase, ref, onValue, set, push } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-import { firebaseConfig } from "./firebase-config.js";
+import { app, db, ref, onValue, set, push } from "./firebase-config.js";
 import { getPhase } from "./data.js";
 
-const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getDatabase(app);
 const eventId = new URLSearchParams(location.search).get("event");
 let uid = null, eventData = null, registrations = {}, items = {}, contributions = {};
 

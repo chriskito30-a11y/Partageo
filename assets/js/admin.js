@@ -1,10 +1,8 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getDatabase, ref, get, onValue, set, update, remove } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-import { firebaseConfig } from "./firebase-config.js";
+import { app, db, ref, get, onValue, set, update, remove } from "./firebase-config.js";
 import { generateItems, slugify } from "./data.js";
 
-const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getDatabase(app);
+const auth = getAuth(app);
 const $ = id => document.getElementById(id);
 let eventId = new URLSearchParams(location.search).get("event") || "";
 let eventData = null, registrations = {}, items = {}, contributions = {}, allEvents = {};
@@ -40,9 +38,13 @@ onAuthStateChanged(auth, async user => {
 });
 
 function subscribeEventsList(){
+  const listEl = $("eventsList");
+  if(listEl) listEl.innerHTML = '<p class="muted">Chargement des événements…</p>';
   onValue(ref(db, "events"), snap => {
     allEvents = snap.val() || {};
     renderEventsList();
+  }, err => {
+    if(listEl) listEl.innerHTML = `<p class="feedback">Impossible de charger les événements : ${esc(err.message || err.code || err)}</p>`;
   });
 }
 
