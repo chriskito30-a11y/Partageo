@@ -113,13 +113,21 @@ $("registrationForm").addEventListener("submit", async e => {
   const existing = currentRegistration();
   const registrationKey = activeRegistrationKey || uid;
   const accessCode = existing?.accessCode || makeCode();
+  const guests = Number($("regGuests").value);
+  const participantLimit = Number(eventData?.participantsLimit ?? eventData?.limits?.participantsPerEvent ?? 30);
+  const previousGuests = Number(existing?.guests || 0);
+  const projectedGuests = totalGuests() - previousGuests + guests;
+  if (participantLimit > 0 && projectedGuests > participantLimit) {
+    $("registrationFeedback").textContent = `Limite gratuite atteinte : ${participantLimit} participant(s) maximum pour cet événement.`;
+    return;
+  }
   const payload = {
     uid: registrationKey,
     ownerAuthUid: uid,
     name,
     nameKey: normalizeName(name),
     accessCode,
-    guests: Number($("regGuests").value),
+    guests,
     comment: $("regComment").value.trim(),
     updatedAt: Date.now(),
     createdAt: existing?.createdAt || Date.now()

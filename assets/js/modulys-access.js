@@ -1,4 +1,4 @@
-import { app, db, ref, get } from "./firebase-config.js";
+import { app, db, ref, get, set } from "./firebase-config.js";
 import {
   getAuth,
   onAuthStateChanged,
@@ -7,6 +7,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 const auth = getAuth(app);
+const DEFAULT_FREE_LIMITS = { eventsPerMonth: 1, participantsPerEvent: 30 };
 
 function normalizeTimestamp(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -34,6 +35,12 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+export function currentBillingPeriod(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
 export function waitForCurrentUser(timeoutMs = 1400) {
   return new Promise((resolve) => {
     let done = false;
@@ -49,6 +56,16 @@ export function waitForCurrentUser(timeoutMs = 1400) {
   });
 }
 
+function resolveLimits(moduleKey, moduleData = {}, planData = {}) {
+  const moduleFree = moduleData?.limits?.free || {};
+  const planLimits = planData?.limits || {};
+  const perModule = planLimits?.[moduleKey] || {};
+  return {
+    eventsPerMonth: Number(moduleFree.eventsPerMonth || perModule.eventsPerMonth || planLimits.eventsPerMonth || DEFAULT_FREE_LIMITS.eventsPerMonth),
+    participantsPerEvent: Number(moduleFree.participantsPerEvent || perModule.participantsPerEvent || planLimits.participantsPerEvent || DEFAULT_FREE_LIMITS.participantsPerEvent)
+  };
+}
+
 export async function getAccessForUser(moduleKey, user) {
   const moduleSnap = await get(ref(db, `modules/${moduleKey}`));
   const moduleData = moduleSnap.val() || null;
@@ -57,21 +74,33 @@ export async function getAccessForUser(moduleKey, user) {
   if (moduleData.active === false) return { allowed: false, reason: "module_inactive", module: moduleData };
   if (moduleData.accessMode === "public") return { allowed: true, reason: "public", module: moduleData };
   if (!user) return { allowed: false, reason: "not_authenticated", module: moduleData };
-  if (moduleData.accessMode === "free_authenticated") return { allowed: true, reason: "free_authenticated", module: moduleData };
 
-  const [accessSnap, subscriptionSnap] = await Promise.all([
+  const [adminsSnap, adminSnap, accessSnap, subscriptionSnap, freePlanSnap] = await Promise.all([
+    get(ref(db, `admins/${user.uid}`)),
+    get(ref(db, `admin/${user.uid}`)),
     get(ref(db, `userAccess/${user.uid}`)),
-    get(ref(db, `subscriptions/${user.uid}`))
+    get(ref(db, `subscriptions/${user.uid}`)),
+    get(ref(db, "plans/free"))
   ]);
+
+  const isAdmin = Boolean(adminsSnap.val() || adminSnap.val());
   const access = accessSnap.val() || {};
   const subscription = subscriptionSnap.val() || null;
+  const freePlan = freePlanSnap.val() || {};
+  const freeLimits = resolveLimits(moduleKey, moduleData, freePlan);
 
-  if (isActiveGrant(access.allModules)) return { allowed: true, reason: "all_modules", module: moduleData };
-  if (isActiveGrant(access.modules?.[moduleKey])) return { allowed: true, reason: "module_grant", module: moduleData };
+  if (isAdmin) return { allowed: true, reason: "admin", module: moduleData, isAdmin, access, subscription, planId: "admin", limits: null, unlimited: true };
+  if (isActiveGrant(access.allModules)) return { allowed: true, reason: "all_modules", module: moduleData, isAdmin, access, subscription, planId: access.planId || "custom", limits: null, unlimited: true };
+  if (isActiveGrant(access.modules?.[moduleKey])) return { allowed: true, reason: "module_grant", module: moduleData, isAdmin, access, subscription, planId: access.planId || "custom", limits: null, unlimited: true };
   if (isActiveGrant(subscription) && (subscription.scope === "allModules" || subscription.modules?.[moduleKey] === true)) {
-    return { allowed: true, reason: "subscription", module: moduleData };
+    return { allowed: true, reason: "subscription", module: moduleData, isAdmin, access, subscription, planId: subscription.planId || "subscription", limits: null, unlimited: true };
   }
-  return { allowed: false, reason: "no_grant", module: moduleData };
+
+  if (moduleData.accessMode === "free_authenticated") {
+    return { allowed: true, reason: "free_authenticated", module: moduleData, isAdmin, access, subscription, planId: "free", limits: freeLimits, unlimited: false };
+  }
+
+  return { allowed: false, reason: "no_grant", module: moduleData, isAdmin, access, subscription, planId: "none", limits: freeLimits, unlimited: false };
 }
 
 function reasonLabel(reason) {
@@ -79,7 +108,8 @@ function reasonLabel(reason) {
     not_authenticated: "Vous devez vous connecter avec votre compte Modulys pour ouvrir ce module.",
     module_not_declared: "Ce module n’est pas encore déclaré dans Firebase.",
     module_inactive: "Ce module est actuellement désactivé.",
-    no_grant: "Votre compte ne possède pas encore les droits pour ce module."
+    no_grant: "Votre compte ne possède pas encore les droits pour ce module.",
+    free_limit_reached: "La limite gratuite de ce module est atteinte pour ce mois."
   }[reason] || "Accès non disponible.";
 }
 
@@ -157,4 +187,67 @@ export async function enforceModuleAccess(moduleKey, options = {}) {
     }
     return true;
   }
+}
+
+export async function getModuleAccessContext(moduleKey) {
+  const user = await waitForCurrentUser(1800);
+  const access = await getAccessForUser(moduleKey, user);
+  if (!user || !access.allowed) {
+    throw new Error(reasonLabel(access.reason));
+  }
+  return { user, ...access };
+}
+
+export async function readModuleUsage(moduleKey, userUid, period = currentBillingPeriod()) {
+  const snap = await get(ref(db, `usage/${userUid}/${period}/${moduleKey}`));
+  const data = snap.val() || {};
+  return {
+    eventsCreated: Number(data.eventsCreated || 0),
+    entities: data.entities || {}
+  };
+}
+
+export async function assertCanCreateModuleEvent(moduleKey) {
+  const context = await getModuleAccessContext(moduleKey);
+  const period = currentBillingPeriod();
+  if (context.unlimited) return { ...context, period, usage: { eventsCreated: 0 } };
+
+  const limits = context.limits || DEFAULT_FREE_LIMITS;
+  const usage = await readModuleUsage(moduleKey, context.user.uid, period);
+  if (usage.eventsCreated >= limits.eventsPerMonth) {
+    throw new Error(`Limite gratuite atteinte : ${limits.eventsPerMonth} création par mois pour ce module. Passez à une offre payante ou attendez le mois prochain.`);
+  }
+  return { ...context, period, usage };
+}
+
+export function buildModuleEntityMeta(context) {
+  const limits = context.limits || {};
+  return {
+    ownerUid: context.user?.uid || "",
+    ownerEmail: context.user?.email || "",
+    moduleId: context.module?.id || "",
+    planId: context.unlimited ? (context.planId || "admin") : "free",
+    billingPeriod: context.period || currentBillingPeriod(),
+    limits: {
+      eventsPerMonth: context.unlimited ? 0 : Number(limits.eventsPerMonth || DEFAULT_FREE_LIMITS.eventsPerMonth),
+      participantsPerEvent: context.unlimited ? 0 : Number(limits.participantsPerEvent || DEFAULT_FREE_LIMITS.participantsPerEvent)
+    }
+  };
+}
+
+export async function recordModuleEventUsage(moduleKey, entityId, context) {
+  if (!context || context.unlimited) return;
+  const period = context.period || currentBillingPeriod();
+  const uid = context.user?.uid;
+  if (!uid || !entityId) return;
+  const current = Number(context.usage?.eventsCreated || 0);
+  const next = current + 1;
+  await set(ref(db, `usage/${uid}/${period}/${moduleKey}/eventsCreated`), next);
+  await set(ref(db, `usage/${uid}/${period}/${moduleKey}/entities/${entityId}`), true);
+  await set(ref(db, `usage/${uid}/${period}/${moduleKey}/updatedAt`), Date.now());
+}
+
+export function getParticipantLimitFromEntity(entity = {}, fallback = DEFAULT_FREE_LIMITS.participantsPerEvent) {
+  const direct = Number(entity?.limits?.participantsPerEvent || entity?.participantsLimit || entity?.config?.participantsLimit || entity?.meta?.participantsLimit || 0);
+  return direct > 0 ? direct : fallback;
 }
