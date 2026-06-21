@@ -1,11 +1,14 @@
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { app, db, ref, get, onValue, set, update, remove } from "./firebase-config.js";
+import { getAccessForUser } from "./modulys-access.js";
 import { generateItems, slugify } from "./data.js";
 
 const auth = getAuth(app);
 const $ = id => document.getElementById(id);
 let eventId = new URLSearchParams(location.search).get("event") || "";
 let eventData = null, registrations = {}, items = {}, contributions = {}, allEvents = {};
+let currentUser = null;
+let isSuperAdmin = false;
 
 $("eventId").value = eventId;
 $("loginForm").addEventListener("submit", async e => {
@@ -25,12 +28,15 @@ onAuthStateChanged(auth, async user => {
     $("adminArea").classList.add("hidden");
     return;
   }
-  const [adminsSnap, adminSnap] = await Promise.all([
+  currentUser = user;
+  const [adminsSnap, adminSnap, access] = await Promise.all([
     get(ref(db, `admins/${user.uid}`)),
-    get(ref(db, `admin/${user.uid}`))
+    get(ref(db, `admin/${user.uid}`)),
+    getAccessForUser("partageo", user)
   ]);
-  if(!adminsSnap.val() && !adminSnap.val()){
-    $("loginFeedback").textContent = "Compte connecté, mais UID non autorisé dans /admins ou /admin.";
+  isSuperAdmin = Boolean(adminsSnap.val() || adminSnap.val());
+  if(!isSuperAdmin && !access.allowed){
+    $("loginFeedback").textContent = "Compte connecté, mais accès Partageo non disponible dans Modulys.";
     await signOut(auth);
     return;
   }
@@ -94,7 +100,8 @@ $("eventForm").addEventListener("submit", async e => {
     generalNote:$("generalNoteInput").value.trim(),
     manualPhase2:$("manualPhase2").checked,
     updatedAt:Date.now(),
-    createdAt:eventData?.createdAt || Date.now()
+    createdAt:eventData?.createdAt || Date.now(),
+    ownerUid:eventData?.ownerUid || currentUser?.uid || ""
   };
   await set(ref(db, `events/${id}`), payload);
   $("eventFeedback").textContent = "Événement enregistré. Tu peux maintenant le retrouver dans Mes événements.";
@@ -126,7 +133,9 @@ $("deleteEventBtn").addEventListener("click", async () => {
 });
 
 function renderEventsList(){
-  const list = Object.values(allEvents).sort((a,b)=>String(b.eventDate||"").localeCompare(String(a.eventDate||"")));
+  const list = Object.values(allEvents)
+    .filter(ev => isSuperAdmin || ev.ownerUid === currentUser?.uid)
+    .sort((a,b)=>String(b.eventDate||"").localeCompare(String(a.eventDate||"")));
   if(!list.length){
     $("eventsList").innerHTML = '<p class="muted">Aucun événement créé pour le moment.</p>';
     return;
