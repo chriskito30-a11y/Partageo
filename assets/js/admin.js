@@ -1,6 +1,6 @@
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { app, db, ref, get, onValue, set, update, remove } from "./firebase-config.js";
-import { enforceModuleAccess, assertCanCreateModuleEvent, buildModuleEntityMeta, recordModuleEventUsage } from "./modulys-access.js";
+import { enforceModuleAccess, assertCanCreateModuleEvent, buildModuleEntityMeta, recordModuleEventUsage, isFreeLimitError, renderFreeLimitUpgrade } from "./modulys-access.js";
 import { generateItems, slugify } from "./data.js";
 
 const auth = getAuth(app);
@@ -80,36 +80,47 @@ function adminUrl(id){ return `${location.origin}${location.pathname}?event=${id
 
 $("eventForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const id = slugify($("eventId").value.trim());
-  const isNewEvent = !eventData || eventId !== id;
-  let usageContext = null;
-  let moduleMeta = {};
-  if(isNewEvent){
-    usageContext = await assertCanCreateModuleEvent("partageo");
-    moduleMeta = buildModuleEntityMeta(usageContext);
+  const form = e.currentTarget;
+  const submitBtn = form?.querySelector('button[type="submit"], input[type="submit"]');
+  if(submitBtn) submitBtn.disabled = true;
+  try{
+    const id = slugify($("eventId").value.trim());
+    const isNewEvent = !eventData || eventId !== id;
+    let usageContext = null;
+    let moduleMeta = {};
+    if(isNewEvent){
+      usageContext = await assertCanCreateModuleEvent("partageo");
+      moduleMeta = buildModuleEntityMeta(usageContext);
+    }
+    const payload = {
+      ...moduleMeta,
+      id,
+      title:$("title").value.trim(),
+      description:$("description").value.trim(),
+      eventDate:$("eventDate").value,
+      registrationDeadline:$("registrationDeadline").value,
+      contributionDeadline:$("contributionDeadline").value,
+      generalNote:$("generalNoteInput").value.trim(),
+      manualPhase2:$("manualPhase2").checked,
+      updatedAt:Date.now(),
+      createdAt:eventData?.createdAt || Date.now(),
+      ownerUid:eventData?.ownerUid || moduleMeta.ownerUid || currentUser?.uid || "",
+      ownerEmail:eventData?.ownerEmail || moduleMeta.ownerEmail || currentUser?.email || "",
+      moduleId:eventData?.moduleId || moduleMeta.moduleId || "partageo",
+      planId:eventData?.planId || moduleMeta.planId || "free",
+      billingPeriod:eventData?.billingPeriod || moduleMeta.billingPeriod || "",
+      participantsLimit:Number(eventData?.participantsLimit ?? moduleMeta?.limits?.participantsPerEvent ?? 30)
+    };
+    await set(ref(db, `events/${id}`), payload);
+    if(isNewEvent) await recordModuleEventUsage("partageo", id, usageContext);
+    $("eventFeedback").textContent = "Événement enregistré. Tu peux maintenant le retrouver dans Mes événements.";
+    subscribe(id);
+  }catch(error){
+    if(isFreeLimitError(error) && renderFreeLimitUpgrade($("eventFeedback"), "partageo", error)) return;
+    $("eventFeedback").textContent = error.message || "Impossible d’enregistrer l’événement.";
+  }finally{
+    if(submitBtn) submitBtn.disabled = false;
   }
-  const payload = {
-    ...moduleMeta,
-    id,
-    title:$("title").value.trim(),
-    description:$("description").value.trim(),
-    eventDate:$("eventDate").value,
-    registrationDeadline:$("registrationDeadline").value,
-    contributionDeadline:$("contributionDeadline").value,
-    generalNote:$("generalNoteInput").value.trim(),
-    manualPhase2:$("manualPhase2").checked,
-    updatedAt:Date.now(),
-    createdAt:eventData?.createdAt || Date.now(),
-    ownerUid:eventData?.ownerUid || moduleMeta.ownerUid || currentUser?.uid || "",
-    moduleId:eventData?.moduleId || moduleMeta.moduleId || "partageo",
-    planId:eventData?.planId || moduleMeta.planId || "free",
-    billingPeriod:eventData?.billingPeriod || moduleMeta.billingPeriod || "",
-    participantsLimit:Number(eventData?.participantsLimit ?? moduleMeta?.limits?.participantsPerEvent ?? 30)
-  };
-  await set(ref(db, `events/${id}`), payload);
-  if(isNewEvent) await recordModuleEventUsage("partageo", id, usageContext);
-  $("eventFeedback").textContent = "Événement enregistré. Tu peux maintenant le retrouver dans Mes événements.";
-  subscribe(id);
 });
 
 $("generateItemsBtn").addEventListener("click", async () => {

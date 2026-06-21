@@ -89,10 +89,21 @@ export async function getAccessForUser(moduleKey, user) {
   const freePlan = freePlanSnap.val() || {};
   const freeLimits = resolveLimits(moduleKey, moduleData, freePlan);
 
+  const accessPlanId = String(access.planId || "").toLowerCase();
+  const isFreePlan = !accessPlanId || accessPlanId === "free";
+
   if (isAdmin) return { allowed: true, reason: "admin", module: moduleData, isAdmin, access, subscription, planId: "admin", limits: null, unlimited: true };
-  if (isActiveGrant(access.allModules)) return { allowed: true, reason: "all_modules", module: moduleData, isAdmin, access, subscription, planId: access.planId || "custom", limits: null, unlimited: true };
-  if (isActiveGrant(access.modules?.[moduleKey])) return { allowed: true, reason: "module_grant", module: moduleData, isAdmin, access, subscription, planId: access.planId || "custom", limits: null, unlimited: true };
+  if (isActiveGrant(access.allModules)) {
+    if (isFreePlan) return { allowed: true, reason: "free_all_modules", module: moduleData, isAdmin, access, subscription, planId: "free", limits: freeLimits, unlimited: false };
+    return { allowed: true, reason: "all_modules", module: moduleData, isAdmin, access, subscription, planId: access.planId || "custom", limits: null, unlimited: true };
+  }
+  if (isActiveGrant(access.modules?.[moduleKey])) {
+    if (isFreePlan) return { allowed: true, reason: "free_module_grant", module: moduleData, isAdmin, access, subscription, planId: "free", limits: freeLimits, unlimited: false };
+    return { allowed: true, reason: "module_grant", module: moduleData, isAdmin, access, subscription, planId: access.planId || "custom", limits: null, unlimited: true };
+  }
   if (isActiveGrant(subscription) && (subscription.scope === "allModules" || subscription.modules?.[moduleKey] === true)) {
+    const subscriptionPlanId = String(subscription.planId || subscription.id || "subscription").toLowerCase();
+    if (subscriptionPlanId === "free") return { allowed: true, reason: "free_subscription", module: moduleData, isAdmin, access, subscription, planId: "free", limits: freeLimits, unlimited: false };
     return { allowed: true, reason: "subscription", module: moduleData, isAdmin, access, subscription, planId: subscription.planId || "subscription", limits: null, unlimited: true };
   }
 
@@ -101,6 +112,44 @@ export async function getAccessForUser(moduleKey, user) {
   }
 
   return { allowed: false, reason: "no_grant", module: moduleData, isAdmin, access, subscription, planId: "none", limits: freeLimits, unlimited: false };
+}
+
+
+export function isFreeLimitError(error) {
+  return Boolean(error && (error.code === "modulys/free-limit-reached" || String(error.message || "").toLowerCase().includes("limite gratuite atteinte")));
+}
+
+function moduleDisplayName(moduleKey) {
+  return {
+    improvote: "ImproVote",
+    blindtestmaster: "BlindTestMaster",
+    quizmaster: "QuizMaster",
+    partageo: "Partageo"
+  }[moduleKey] || moduleKey;
+}
+
+export function upgradeOfferHtml(moduleKey, error = {}) {
+  const limits = error.limits || {};
+  const period = error.period || currentBillingPeriod();
+  const max = Number(limits.eventsPerMonth || DEFAULT_FREE_LIMITS.eventsPerMonth || 1);
+  const moduleName = moduleDisplayName(moduleKey);
+  return `<div style="display:grid;gap:12px;padding:16px;border:1px solid #f59e0b;border-radius:18px;background:#fffbeb;color:#78350f">
+    <strong style="font-size:1.05rem">Limite gratuite atteinte</strong>
+    <span>Votre offre gratuite permet ${max} création${max > 1 ? "s" : ""} par mois pour ${escapeHtml(moduleName)}. La limite est déjà utilisée pour ${escapeHtml(period)}.</span>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+      <a href="https://modulys.top/#tarifs" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#7c3aed;color:#fff;text-decoration:none;font-weight:900;padding:10px 14px">Voir les offres</a>
+      <a href="https://modulys.top/#contact" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#fff;color:#7c3aed;border:1px solid #ddd6fe;text-decoration:none;font-weight:900;padding:10px 14px">Débloquer mon accès</a>
+    </div>
+    <small style="color:#92400e">Options prévues : Pass événement, abonnement mensuel, annuel ou Lifetime.</small>
+  </div>`;
+}
+
+export function renderFreeLimitUpgrade(target, moduleKey, error = {}) {
+  const el = typeof target === "string" ? document.querySelector(target) : target;
+  if (!el) return false;
+  el.innerHTML = upgradeOfferHtml(moduleKey, error);
+  if ("className" in el) el.className = `${el.className || ""} modulys-upgrade-prompt`.trim();
+  return true;
 }
 
 function reasonLabel(reason) {
@@ -215,7 +264,13 @@ export async function assertCanCreateModuleEvent(moduleKey) {
   const limits = context.limits || DEFAULT_FREE_LIMITS;
   const usage = await readModuleUsage(moduleKey, context.user.uid, period);
   if (usage.eventsCreated >= limits.eventsPerMonth) {
-    throw new Error(`Limite gratuite atteinte : ${limits.eventsPerMonth} création par mois pour ce module. Passez à une offre payante ou attendez le mois prochain.`);
+    const error = new Error(`Limite gratuite atteinte : ${limits.eventsPerMonth} création par mois pour ce module. Passez à une offre payante ou attendez le mois prochain.`);
+    error.code = "modulys/free-limit-reached";
+    error.moduleKey = moduleKey;
+    error.limits = limits;
+    error.usage = usage;
+    error.period = period;
+    throw error;
   }
   return { ...context, period, usage };
 }
