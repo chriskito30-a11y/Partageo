@@ -26,8 +26,19 @@
     <section id="adminArea" class="hidden">
       <section class="card">
         <div class="section-title">
-          <h2>Créer / charger un événement</h2>
+          <div>
+            <h2>Mes événements</h2>
+            <p class="muted">Retrouve ici les événements déjà créés pour les modifier ou récupérer le lien public.</p>
+          </div>
           <button id="logoutBtn" class="ghost danger">Déconnexion</button>
+        </div>
+        <div id="eventsList" class="event-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <h2>Créer / modifier un événement</h2>
+          <button id="newEventBtn" type="button" class="ghost">Nouvel événement</button>
         </div>
         <form id="eventForm" class="form two-cols">
           <label>Identifiant URL unique<input id="eventId" required pattern="[a-z0-9-]{3,60}" placeholder="repas-ete-2026" /></label>
