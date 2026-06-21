@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — Partageo</title>
+  <link rel="stylesheet" href="assets/css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">Administration</p><h1>Partageo</h1></div>
+    <a class="ghost" href="index.html">Page publique</a>
+  </header>
+
+  <main class="shell">
+    <section id="loginCard" class="card">
+      <h2>Connexion organisateur</h2>
+      <form id="loginForm" class="form compact">
+        <label>Email<input id="adminEmail" type="email" required /></label>
+        <label>Mot de passe<input id="adminPassword" type="password" required /></label>
+        <button type="submit">Se connecter</button>
+      </form>
+      <p id="loginFeedback" class="feedback"></p>
+    </section>
+
+    <section id="adminArea" class="hidden">
+      <section class="card">
+        <div class="section-title">
+          <h2>Créer / charger un événement</h2>
+          <button id="logoutBtn" class="ghost danger">Déconnexion</button>
+        </div>
+        <form id="eventForm" class="form two-cols">
+          <label>Identifiant URL unique<input id="eventId" required pattern="[a-z0-9-]{3,60}" placeholder="repas-ete-2026" /></label>
+          <label>Titre<input id="title" required maxlength="120" /></label>
+          <label>Date de l’événement<input id="eventDate" type="date" required /></label>
+          <label>Date butoir inscription<input id="registrationDeadline" type="datetime-local" required /></label>
+          <label>Date butoir choix apports<input id="contributionDeadline" type="datetime-local" required /></label>
+          <label>Description<textarea id="description" maxlength="800"></textarea></label>
+          <label>Remarque générale<textarea id="generalNoteInput" maxlength="800"></textarea></label>
+          <label class="checkbox"><input id="manualPhase2" type="checkbox" /> Activer manuellement “qui apporte quoi”</label>
+          <button type="submit">Enregistrer l’événement</button>
+        </form>
+        <p id="eventFeedback" class="feedback"></p>
+      </section>
+
+      <section id="dashboard" class="grid hidden">
+        <article class="card hero-card">
+          <div class="stats">
+            <div><strong id="adminTotalGuests">0</strong><span>convives</span></div>
+            <div><strong id="adminRegistrations">0</strong><span>inscriptions</span></div>
+          </div>
+          <p>Lien public : <a id="publicLink" target="_blank" rel="noopener"></a></p>
+          <button id="generateItemsBtn" type="button">Recalculer les lignes selon les convives</button>
+          <button id="deleteEventBtn" type="button" class="danger">Supprimer l’événement</button>
+        </article>
+
+        <article class="card">
+          <h2>Ajouter une ligne</h2>
+          <form id="itemForm" class="form compact">
+            <input id="itemName" placeholder="Nom de catégorie" required />
+            <input id="itemNeeded" type="number" min="1" value="1" required />
+            <textarea id="itemNote" placeholder="Note"></textarea>
+            <label class="checkbox"><input id="itemIsQuantity" type="checkbox" /> Ligne à quantité variable ex. chaises</label>
+            <button type="submit">Ajouter</button>
+          </form>
+        </article>
+      </section>
+
+      <section id="adminTables" class="card hidden">
+        <h2>Suivi</h2>
+        <h3>Inscrits</h3>
+        <div id="registrationsList" class="list"></div>
+        <h3>Catégories</h3>
+        <div class="table-scroll"><table><thead><tr><th>Catégorie</th><th>Nécessaire</th><th>Note</th><th>Actions</th></tr></thead><tbody id="adminItemsTable"></tbody></table></div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="assets/js/admin.js"></script>
+</body>
+</html>

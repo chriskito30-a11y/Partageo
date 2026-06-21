@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Partageo</title>
+  <link rel="stylesheet" href="assets/css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Repas partagé</p>
+      <h1 id="eventTitle">Partageo</h1>
+      <p id="eventDescription" class="muted"></p>
+    </div>
+    <a class="ghost" href="admin.html">Organisateur</a>
+  </header>
+
+  <main class="shell">
+    <section id="loadingCard" class="card"><p>Chargement de l’événement…</p></section>
+
+    <section id="noEventCard" class="card hidden">
+      <h2>Événement introuvable</h2>
+      <p>Le lien doit contenir un identifiant d’événement, par exemple : <code>?event=repas-asso-2026</code>.</p>
+    </section>
+
+    <section id="eventCard" class="grid hidden">
+      <article class="card hero-card">
+        <div class="stats">
+          <div><strong id="totalGuests">0</strong><span>convives prévus</span></div>
+          <div><strong id="phaseLabel">Inscriptions</strong><span>phase actuelle</span></div>
+        </div>
+        <p id="eventDates" class="muted"></p>
+        <p id="generalNote" class="notice hidden"></p>
+      </article>
+
+      <article id="registrationPanel" class="card">
+        <h2>Je participe</h2>
+        <form id="registrationForm" class="form">
+          <label>Nom / prénom<input id="regName" required maxlength="80" placeholder="Ex. Marie Dupont" /></label>
+          <label>Nombre de personnes au total<input id="regGuests" type="number" min="1" max="30" required value="1" /></label>
+          <label>Commentaire optionnel<textarea id="regComment" maxlength="500" placeholder="Allergie, précision, arrivée tardive…"></textarea></label>
+          <button type="submit">Enregistrer ma participation</button>
+        </form>
+        <p id="registrationFeedback" class="feedback"></p>
+      </article>
+
+      <article id="contributionPanel" class="card hidden">
+        <h2>Je choisis ce que j’apporte</h2>
+        <form id="contributionForm" class="form">
+          <label>Catégorie<select id="contribItem" required></select></label>
+          <label>Ce que j’apporte précisément<input id="contribLabel" required maxlength="120" placeholder="Ex. 2 quiches lorraines" /></label>
+          <label id="quantityWrap" class="hidden">Nombre apporté<input id="contribQty" type="number" min="1" max="200" value="1" /></label>
+          <label>Commentaire<textarea id="contribComment" maxlength="500" placeholder="Détail utile pour éviter les doublons…"></textarea></label>
+          <button type="submit">Valider ce que j’apporte</button>
+        </form>
+        <p id="contributionFeedback" class="feedback"></p>
+      </article>
+    </section>
+
+    <section id="tableSection" class="card hidden">
+      <div class="section-title">
+        <h2>Répartition</h2>
+        <p class="muted">Le “nécessaire” correspond au nombre d’emplacements à remplir.</p>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Catégorie</th><th>Nécessaire</th><th>Déjà pris</th><th>Restant</th><th>Notes</th><th>Participants inscrits</th></tr></thead>
+          <tbody id="itemsTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
