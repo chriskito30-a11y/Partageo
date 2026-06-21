@@ -1,9 +1,12 @@
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { app, db, ref, get, onValue, set, update, remove } from "./firebase-config.js";
-import { getAccessForUser } from "./modulys-access.js";
+import { enforceModuleAccess } from "./modulys-access.js";
 import { generateItems, slugify } from "./data.js";
 
 const auth = getAuth(app);
+const __modulysAccessOk = await enforceModuleAccess("partageo", { mode: "hard" });
+if (!__modulysAccessOk) throw new Error("Modulys access denied");
+
 const $ = id => document.getElementById(id);
 let eventId = new URLSearchParams(location.search).get("event") || "";
 let eventData = null, registrations = {}, items = {}, contributions = {}, allEvents = {};
@@ -11,35 +14,23 @@ let currentUser = null;
 let isSuperAdmin = false;
 
 $("eventId").value = eventId;
-$("loginForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  try{
-    await signInWithEmailAndPassword(auth, $("adminEmail").value, $("adminPassword").value);
-  }catch(err){
-    $("loginFeedback").textContent = err.message;
-  }
+$("logoutBtn").addEventListener("click", async () => {
+  await signOut(auth);
+  location.reload();
 });
-$("logoutBtn").addEventListener("click", () => signOut(auth));
 $("newEventBtn").addEventListener("click", resetEventForm);
 
 onAuthStateChanged(auth, async user => {
   if(!user){
-    $("loginCard").classList.remove("hidden");
-    $("adminArea").classList.add("hidden");
+    location.reload();
     return;
   }
   currentUser = user;
-  const [adminsSnap, adminSnap, access] = await Promise.all([
+  const [adminsSnap, adminSnap] = await Promise.all([
     get(ref(db, `admins/${user.uid}`)),
-    get(ref(db, `admin/${user.uid}`)),
-    getAccessForUser("partageo", user)
+    get(ref(db, `admin/${user.uid}`))
   ]);
   isSuperAdmin = Boolean(adminsSnap.val() || adminSnap.val());
-  if(!isSuperAdmin && !access.allowed){
-    $("loginFeedback").textContent = "Compte connecté, mais accès Partageo non disponible dans Modulys.";
-    await signOut(auth);
-    return;
-  }
   $("loginCard").classList.add("hidden");
   $("adminArea").classList.remove("hidden");
   subscribeEventsList();
