@@ -166,11 +166,56 @@ function render(){
   const url = publicUrl(eventId);
   $("publicLink").href = url;
   $("publicLink").textContent = url;
-  $("registrationsList").innerHTML = Object.values(registrations).map(r=>`<article><strong>${esc(r.name)}</strong> · ${Number(r.guests||0)} personne(s)<br><span class="muted">${esc(r.comment||"")}</span></article>`).join("") || "<p>Aucun inscrit.</p>";
+  renderRegistrationsAdmin();
   $("adminItemsTable").innerHTML = Object.values(items).map(item=>`<tr><td><input data-id="${item.id}" data-field="name" value="${esc(item.name)}"></td><td><input type="number" min="1" data-id="${item.id}" data-field="needed" value="${Number(item.needed||1)}"><br><small>${takenFor(item)} pris</small></td><td><textarea data-id="${item.id}" data-field="note">${esc(item.note||"")}</textarea></td><td class="row-actions"><button data-save="${item.id}">Sauver</button><button class="danger" data-delete="${item.id}">Supprimer</button></td></tr>`).join("");
   document.querySelectorAll("[data-save]").forEach(btn => btn.onclick = () => saveItem(btn.dataset.save));
   document.querySelectorAll("[data-delete]").forEach(btn => btn.onclick = () => remove(ref(db,`contributionItems/${eventId}/${btn.dataset.delete}`)));
 }
+
+function renderRegistrationsAdmin(){
+  const rows = Object.values(registrations);
+  if(!rows.length){
+    $("registrationsList").innerHTML = "<p>Aucun inscrit.</p>";
+    return;
+  }
+  $("registrationsList").innerHTML = rows
+    .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""), "fr"))
+    .map(r=>{
+      const uid = r.uid || "";
+      const userContribs = Object.values(contributions).filter(c => c.uid === uid);
+      const contribText = userContribs.length
+        ? userContribs.map(c => `${esc(c.label || "Apport")} <span class="muted">(${esc((items[c.itemId]?.name) || c.itemId || "")})</span>`).join("<br>")
+        : '<span class="muted">Aucun apport choisi pour le moment.</span>';
+      return `<article class="registration-card">
+        <div class="registration-main">
+          <strong>${esc(r.name)}</strong> · ${Number(r.guests||0)} personne(s)
+          <br><span class="muted">${esc(r.comment||"")}</span>
+          <div class="contrib-summary">${contribText}</div>
+        </div>
+        <div class="access-code-admin">
+          <label>Code accès public
+            <input data-registration-code="${esc(uid)}" value="${esc(r.accessCode || "")}" maxlength="12" inputmode="numeric" />
+          </label>
+          <button type="button" class="ghost" data-save-registration-code="${esc(uid)}">Modifier le code</button>
+          <span class="copy-feedback" id="reg-code-feedback-${esc(uid)}"></span>
+        </div>
+      </article>`;
+    }).join("");
+  document.querySelectorAll("[data-save-registration-code]").forEach(btn => btn.onclick = () => saveRegistrationCode(btn.dataset.saveRegistrationCode));
+}
+
+async function saveRegistrationCode(uid){
+  const input = document.querySelector(`[data-registration-code="${CSS.escape(uid)}"]`);
+  const code = String(input?.value || "").trim();
+  const feedback = $(`reg-code-feedback-${uid}`);
+  if(code.length < 4 || code.length > 12){
+    if(feedback) feedback.textContent = "Code entre 4 et 12 caractères.";
+    return;
+  }
+  await update(ref(db, `registrations/${eventId}/${uid}`), { accessCode: code, updatedAt: Date.now() });
+  if(feedback) feedback.textContent = "Code modifié.";
+}
+
 async function saveItem(id){
   const patch = {};
   document.querySelectorAll(`[data-id="${id}"]`).forEach(el => patch[el.dataset.field] = el.dataset.field === "needed" ? Number(el.value) : el.value);
