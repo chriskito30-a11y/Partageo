@@ -32,10 +32,12 @@
         </div>
         <p id="eventDates" class="muted"></p>
         <p id="generalNote" class="notice hidden"></p>
+        <p id="activeIdentity" class="notice soft hidden"></p>
       </article>
 
       <article id="registrationPanel" class="card">
         <h2>Je participe</h2>
+        <p class="muted">Inscription sans compte. Après validation, garde ton code personnel pour revenir plus tard.</p>
         <form id="registrationForm" class="form">
           <label>Nom / prénom<input id="regName" required maxlength="80" placeholder="Ex. Marie Dupont" /></label>
           <label>Nombre de personnes au total<input id="regGuests" type="number" min="1" max="30" required value="1" /></label>
@@ -45,8 +47,20 @@
         <p id="registrationFeedback" class="feedback"></p>
       </article>
 
+      <article id="recoverPanel" class="card">
+        <h2>J’ai déjà une inscription</h2>
+        <p class="muted">Retrouve ton inscription avec ton nom et ton code personnel.</p>
+        <form id="recoverForm" class="form">
+          <label>Nom / prénom<input id="recoverName" required maxlength="80" placeholder="Ex. Marie Dupont" /></label>
+          <label>Code personnel<input id="recoverCode" required maxlength="12" inputmode="numeric" placeholder="Ex. 4827" /></label>
+          <button type="submit" class="ghost">Retrouver mon inscription</button>
+        </form>
+        <p id="recoverFeedback" class="feedback"></p>
+      </article>
+
       <article id="contributionPanel" class="card hidden">
         <h2>Je choisis ce que j’apporte</h2>
+        <p class="muted">Tu dois d’abord avoir une inscription active, soit automatiquement, soit avec ton code personnel.</p>
         <form id="contributionForm" class="form">
           <label>Catégorie<select id="contribItem" required></select></label>
           <label>Ce que j’apporte précisément<input id="contribLabel" required maxlength="120" placeholder="Ex. 2 quiches lorraines" /></label>
