@@ -125,8 +125,21 @@ $("eventForm").addEventListener("submit", async e => {
 
 $("generateItemsBtn").addEventListener("click", async () => {
   if(!eventId) return;
-  const generated = {}; generateItems(totalGuests()).forEach(item => generated[item.id] = item);
-  await set(ref(db, `contributionItems/${eventId}`), generated);
+  try{
+    const generated = {};
+    generateItems(totalGuests()).forEach(item => generated[item.id] = item);
+    const updates = {};
+    Object.keys(items || {}).forEach(itemId => {
+      updates[`contributionItems/${eventId}/${itemId}`] = null;
+    });
+    Object.entries(generated).forEach(([itemId, item]) => {
+      updates[`contributionItems/${eventId}/${itemId}`] = item;
+    });
+    await update(ref(db), updates);
+    $("eventFeedback").textContent = "Liste générée.";
+  }catch(error){
+    $("eventFeedback").textContent = error.message || "Impossible de générer la liste.";
+  }
 });
 $("itemForm").addEventListener("submit", async e => {
   e.preventDefault();
@@ -136,14 +149,25 @@ $("itemForm").addEventListener("submit", async e => {
   e.target.reset();
 });
 $("deleteEventBtn").addEventListener("click", async () => {
+  if(!eventId) return;
   if(confirm("Supprimer définitivement cet événement ?")){
-    await Promise.all([
-      remove(ref(db,`events/${eventId}`)),
-      remove(ref(db,`registrations/${eventId}`)),
-      remove(ref(db,`contributionItems/${eventId}`)),
-      remove(ref(db,`contributions/${eventId}`))
-    ]);
-    location.href="admin.html";
+    try{
+      const updates = {};
+      Object.keys(registrations || {}).forEach(registrationId => {
+        updates[`registrations/${eventId}/${registrationId}`] = null;
+      });
+      Object.keys(items || {}).forEach(itemId => {
+        updates[`contributionItems/${eventId}/${itemId}`] = null;
+      });
+      Object.keys(contributions || {}).forEach(contributionId => {
+        updates[`contributions/${eventId}/${contributionId}`] = null;
+      });
+      updates[`events/${eventId}`] = null;
+      await update(ref(db), updates);
+      location.href="admin.html";
+    }catch(error){
+      $("eventFeedback").textContent = error.message || "Impossible de supprimer l’événement.";
+    }
   }
 });
 
