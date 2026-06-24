@@ -10,9 +10,13 @@
   <link rel="stylesheet" href="assets/css/app.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div><p class="eyebrow">Administration</p><h1>Partageo</h1></div>
-    <a class="ghost" href="index.html">Page publique</a>
+  <header class="topbar module-suite-topbar">
+    <a class="module-suite-brand" href="admin.html"><span class="module-suite-mark">🤝</span><span>Partageo</span></a>
+    <div class="module-suite-actions">
+      <a class="ghost" href="https://www.modulys.top/mes-modules.html">Mes modules</a>
+      <a class="ghost" href="index.html">Page publique</a>
+      <button id="logoutBtn" class="ghost danger" type="button">Déconnexion</button>
+    </div>
   </header>
 
   <main class="shell">
@@ -33,7 +37,7 @@
             <h2>Mes événements</h2>
             <p class="muted">Retrouve ici les événements déjà créés pour les modifier ou récupérer le lien public.</p>
           </div>
-          <button id="logoutBtn" class="ghost danger">Déconnexion</button>
+
         </div>
         <div id="eventsList" class="event-list"></div>
       </section>
