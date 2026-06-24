@@ -118,7 +118,7 @@ $("registrationForm").addEventListener("submit", async e => {
   const previousGuests = Number(existing?.guests || 0);
   const projectedGuests = totalGuests() - previousGuests + guests;
   if (participantLimit > 0 && projectedGuests > participantLimit) {
-    $("registrationFeedback").textContent = `Limite gratuite atteinte : ${participantLimit} participant(s) maximum pour cet événement.`;
+    $("registrationFeedback").textContent = `Limite incluse atteinte : ${participantLimit} participant(s) maximum pour cet événement.`;
     return;
   }
   const payload = {

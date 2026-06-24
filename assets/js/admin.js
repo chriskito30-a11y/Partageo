@@ -5,9 +5,19 @@ import { generateItems, slugify } from "./data.js";
 
 const auth = getAuth(app);
 const __modulysAccessOk = await enforceModuleAccess("partageo", { mode: "hard" });
-if (!__modulysAccessOk) throw new Error("Modulys access denied");
+if (!__modulysAccessOk) throw new Error("Accès non autorisé");
 
 const $ = id => document.getElementById(id);
+
+function friendlyErrorMessage(error, fallback = "Une erreur est survenue, veuillez réessayer.") {
+  const raw = String(error?.message || "");
+  const code = String(error?.code || "").toLowerCase();
+  if (code.includes("permission-denied") || /permission_denied|permission denied|missing or insufficient/i.test(raw)) return "Accès non autorisé.";
+  if (code.includes("unauthenticated")) return "Connexion nécessaire.";
+  const technical = /firebase|internal|bad request|cannot read properties|undefined|null|quota/i.test(raw);
+  return technical ? fallback : (raw || fallback);
+}
+
 let eventId = new URLSearchParams(location.search).get("event") || "";
 let eventData = null, registrations = {}, items = {}, contributions = {}, allEvents = {};
 let currentUser = null;
@@ -44,7 +54,7 @@ function subscribeEventsList(){
     allEvents = snap.val() || {};
     renderEventsList();
   }, err => {
-    if(listEl) listEl.innerHTML = `<p class="feedback">Impossible de charger les événements : ${esc(err.message || err.code || err)}</p>`;
+    if(listEl) listEl.innerHTML = `<p class="feedback">${esc(friendlyErrorMessage(err, "Impossible de charger les événements."))}</p>`;
   });
 }
 
@@ -117,7 +127,7 @@ $("eventForm").addEventListener("submit", async e => {
     subscribe(id);
   }catch(error){
     if(isFreeLimitError(error) && renderFreeLimitUpgrade($("eventFeedback"), "partageo", error)) return;
-    $("eventFeedback").textContent = error.message || "Impossible d’enregistrer l’événement.";
+    $("eventFeedback").textContent = friendlyErrorMessage(error, "Impossible d’enregistrer l’événement.");
   }finally{
     if(submitBtn) submitBtn.disabled = false;
   }
@@ -138,7 +148,7 @@ $("generateItemsBtn").addEventListener("click", async () => {
     await update(ref(db), updates);
     $("eventFeedback").textContent = "Liste générée.";
   }catch(error){
-    $("eventFeedback").textContent = error.message || "Impossible de générer la liste.";
+    $("eventFeedback").textContent = friendlyErrorMessage(error, "Impossible de générer la liste.");
   }
 });
 $("itemForm").addEventListener("submit", async e => {
@@ -166,7 +176,7 @@ $("deleteEventBtn").addEventListener("click", async () => {
       await update(ref(db), updates);
       location.href="admin.html";
     }catch(error){
-      $("eventFeedback").textContent = error.message || "Impossible de supprimer l’événement.";
+      $("eventFeedback").textContent = friendlyErrorMessage(error, "Impossible de supprimer l’événement.");
     }
   }
 });

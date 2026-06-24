@@ -116,7 +116,7 @@ export async function getAccessForUser(moduleKey, user) {
 
 
 export function isFreeLimitError(error) {
-  return Boolean(error && (error.code === "modulys/free-limit-reached" || String(error.message || "").toLowerCase().includes("limite gratuite atteinte")));
+  return Boolean(error && (error.code === "modulys/free-limit-reached" || String(error.message || "").toLowerCase().includes("limite de l’offre") || String(error.message || "").toLowerCase().includes("limite incluse") || String(error.message || "").toLowerCase().includes("limite incluse atteinte")));
 }
 
 function moduleDisplayName(moduleKey) {
@@ -134,8 +134,8 @@ export function upgradeOfferHtml(moduleKey, error = {}) {
   const max = Number(limits.eventsPerMonth || DEFAULT_FREE_LIMITS.eventsPerMonth || 1);
   const moduleName = moduleDisplayName(moduleKey);
   return `<div style="display:grid;gap:12px;padding:16px;border:1px solid #f59e0b;border-radius:18px;background:#fffbeb;color:#78350f">
-    <strong style="font-size:1.05rem">Limite gratuite atteinte</strong>
-    <span>Votre offre gratuite permet ${max} création${max > 1 ? "s" : ""} par mois pour ${escapeHtml(moduleName)}. La limite est déjà utilisée pour ${escapeHtml(period)}.</span>
+    <strong style="font-size:1.05rem">Limite de l’offre Découverte atteinte</strong>
+    <span>L’Offre Découverte permet ${max} création${max > 1 ? "s" : ""} par mois pour ${escapeHtml(moduleName)}. La limite est déjà utilisée pour ${escapeHtml(period)}.</span>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
       <a href="https://modulys.top/#tarifs" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#7c3aed;color:#fff;text-decoration:none;font-weight:900;padding:10px 14px">Voir les offres</a>
       <a href="https://modulys.top/#contact" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#fff;color:#7c3aed;border:1px solid #ddd6fe;text-decoration:none;font-weight:900;padding:10px 14px">Débloquer mon accès</a>
@@ -155,10 +155,10 @@ export function renderFreeLimitUpgrade(target, moduleKey, error = {}) {
 function reasonLabel(reason) {
   return {
     not_authenticated: "Vous devez vous connecter avec votre compte Modulys pour ouvrir ce module.",
-    module_not_declared: "Ce module n’est pas encore déclaré dans Firebase.",
+    module_not_declared: "Cet outil est temporairement indisponible.",
     module_inactive: "Ce module est actuellement désactivé.",
     no_grant: "Votre compte ne possède pas encore les droits pour ce module.",
-    free_limit_reached: "La limite gratuite de ce module est atteinte pour ce mois."
+    free_limit_reached: "La limite incluse est atteinte pour ce mois."
   }[reason] || "Accès non disponible.";
 }
 
@@ -203,7 +203,7 @@ function renderLoginRequired(moduleKey, reason) {
       await signInWithEmailAndPassword(auth, email.trim(), password);
       location.reload();
     } catch (error) {
-      if (feedback) feedback.textContent = "Connexion impossible. Vérifiez l’email, le mot de passe ou les domaines autorisés Firebase.";
+      if (feedback) feedback.textContent = "Connexion impossible. Vérifiez l’email et le mot de passe.";
       console.warn("Modulys module login failed", error);
     }
   });
@@ -264,7 +264,7 @@ export async function assertCanCreateModuleEvent(moduleKey) {
   const limits = context.limits || DEFAULT_FREE_LIMITS;
   const usage = await readModuleUsage(moduleKey, context.user.uid, period);
   if (usage.eventsCreated >= limits.eventsPerMonth) {
-    const error = new Error(`Limite gratuite atteinte : ${limits.eventsPerMonth} création par mois pour ce module. Passez à une offre payante ou attendez le mois prochain.`);
+    const error = new Error(`Limite de l’offre Découverte atteinte : ${limits.eventsPerMonth} création par mois pour ce module. Passez à une offre adaptée ou réessayez le mois prochain.`);
     error.code = "modulys/free-limit-reached";
     error.moduleKey = moduleKey;
     error.limits = limits;
