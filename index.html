@@ -6,25 +6,41 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;650;700;800;900&display=swap" rel="stylesheet" />
-  <title>Partageo</title>
+  <title>Partageo — Modulys</title>
+  <meta name="description" content="Partageo évite les doublons, centralise les participants et rend l’organisation d’une auberge espagnole plus simple pour tout le monde." />
   <link rel="stylesheet" href="assets/css/app.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">Repas partagé</p>
-      <h1 id="eventTitle">Partageo</h1>
-      <p id="eventDescription" class="muted"></p>
+  <header class="topbar module-suite-topbar">
+    <a class="module-suite-brand" href="index.html"><span class="module-suite-mark">🍽️</span><span>Partageo</span></a>
+    <div class="module-suite-actions">
+      <a class="ghost" href="admin.html">Créer un repas partagé</a>
+      <a class="ghost" href="demo.html">Voir une démo</a>
+      <a class="ghost" href="https://www.modulys.top/mes-modules.html">Mes modules</a>
     </div>
-    <a class="ghost" href="admin.html">Organisateur</a>
   </header>
 
   <main class="shell">
+    <section class="card suite-public-heading">
+      <p class="eyebrow">Module Modulys · Repas partagé</p>
+      <h1 id="eventTitle">Partageo</h1>
+      <p id="eventDescription" class="muted">Organisez les inscriptions et ce que chacun apporte, sans compte côté invité.</p>
+    </section>
+
     <section id="loadingCard" class="card"><p>Chargement de l’événement…</p></section>
 
-    <section id="noEventCard" class="card hidden">
-      <h2>Événement introuvable</h2>
-      <p>Le lien doit contenir un identifiant d’événement, par exemple : <code>?event=repas-asso-2026</code>.</p>
+    <section id="noEventCard" class="card hidden suite-landing">
+      <p class="eyebrow">Repas partagé</p>
+      <h2>Organisez les inscriptions et ce que chacun apporte.</h2>
+      <p class="muted">Partageo évite les doublons, centralise les participants et rend l’organisation d’une auberge espagnole plus simple pour tout le monde.</p>
+      <div class="suite-actions">
+        <a class="ghost primary-soft" href="admin.html">Créer un repas partagé</a>
+        <a class="ghost" href="demo.html">Voir une démo</a>
+      </div>
+      <div class="suite-steps-grid">
+        <article><strong>Étape 1</strong><span>Créez l’événement et les dates limites.</span></article><article><strong>Étape 2</strong><span>Les invités s’inscrivent sans compte.</span></article><article><strong>Étape 3</strong><span>Chacun choisit ce qu’il apporte et la répartition se met à jour.</span></article>
+      </div>
+      <p class="notice soft"><strong>Offre actuelle :</strong> Offre Découverte : 1 événement par mois, jusqu’à 30 participants.</p>
     </section>
 
     <section id="eventCard" class="grid hidden">
