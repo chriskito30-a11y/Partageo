@@ -80,3 +80,39 @@ button,.ghost {
 th { background:#f8fafc;color:#4c1d95; }
 .pill { background:#eef2ff;color:#4c1d95; }
 @media(max-width:760px){.topbar{padding:1rem}.shell{width:min(100% - 20px,1120px)}}
+
+
+/* Suite Modulys navigation */
+.module-suite-topbar {
+  min-height: 72px;
+}
+.module-suite-brand {
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  color:#111827;
+  text-decoration:none;
+  font-weight:950;
+  letter-spacing:-.04em;
+  font-size:1.18rem;
+}
+.module-suite-mark {
+  display:inline-grid;
+  place-items:center;
+  width:42px;
+  height:42px;
+  border-radius:16px;
+  background:linear-gradient(135deg,#7c3aed,#06b6d4);
+  color:#fff;
+  box-shadow:0 12px 30px rgba(124,58,237,.24);
+}
+.module-suite-actions {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:10px;
+}
+@media(max-width:760px){
+  .module-suite-actions{display:grid;width:100%;}
+  .module-suite-brand{width:100%;}
+}
