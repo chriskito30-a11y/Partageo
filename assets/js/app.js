@@ -6,7 +6,6 @@ const auth = getAuth(app);
 const eventId = new URLSearchParams(location.search).get("event");
 let uid = null, eventData = null, registrations = {}, items = {}, contributions = {};
 let activeRegistrationKey = null;
-let editingContributionId = null;
 
 const $ = (id) => document.getElementById(id);
 const fmt = (d) => d ? new Date(d).toLocaleString("fr-FR", {dateStyle:"medium", timeStyle:"short"}) : "—";
@@ -45,10 +44,8 @@ function ensureActiveRegistration(){
 }
 function currentRegistration(){ return activeRegistrationKey ? registrations[activeRegistrationKey] : null; }
 function totalGuests(){ return Object.values(registrations).reduce((sum,r)=>sum + Number(r.guests || 0),0); }
-function takenFor(item, ignoredContributionId = null){
-  return Object.values(contributions)
-    .filter(c => c.itemId === item.id && c.id !== ignoredContributionId)
-    .reduce((sum,c)=> sum + (item.isQuantityBased ? Number(c.quantity || 1) : 1), 0);
+function takenFor(item){
+  return Object.values(contributions).filter(c => c.itemId === item.id).reduce((sum,c)=> sum + (item.isQuantityBased ? Number(c.quantity || 1) : 1), 0);
 }
 function makeCode(){ return String(Math.floor(1000 + Math.random() * 9000)); }
 function normalizeName(str){ return String(str || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
@@ -78,7 +75,7 @@ function render(){
   }else{
     $("activeIdentity").classList.add("hidden");
   }
-  renderItemSelect(); renderMyContributions(); renderTable();
+  renderItemSelect(); renderTable();
 }
 
 function getSelectedContributionItemIds(){
@@ -94,15 +91,11 @@ function updateQuantityVisibility(){
 function renderItemSelect(){
   const list = $("contribItemsList");
   const previouslySelected = new Set(getSelectedContributionItemIds());
-  const editingContribution = editingContributionId ? contributions[editingContributionId] : null;
   list.innerHTML = "";
 
-  const availableItems = Object.values(items).filter(item => {
-    const remaining = Number(item.needed || 0) - takenFor(item, editingContributionId);
-    return remaining > 0 || item.id === editingContribution?.itemId || previouslySelected.has(item.id);
-  });
+  const availableItems = Object.values(items).filter(item => Number(item.needed || 0) - takenFor(item) > 0);
   availableItems.forEach(item => {
-    const remaining = Math.max(0, Number(item.needed || 0) - takenFor(item, editingContributionId));
+    const remaining = Number(item.needed || 0) - takenFor(item);
     const option = document.createElement("label");
     option.className = "choice-card";
     option.innerHTML = `
@@ -123,64 +116,6 @@ function renderItemSelect(){
   updateQuantityVisibility();
 }
 $("contribItemsList").addEventListener("change", updateQuantityVisibility);
-
-function renderMyContributions(){
-  const wrap = $("myContributions");
-  const reg = currentRegistration();
-  if(!wrap) return;
-  const mine = Object.values(contributions).filter(c => c.registrationUid === activeRegistrationKey);
-  if(!reg || !mine.length){
-    wrap.classList.add("hidden");
-    wrap.innerHTML = "";
-    return;
-  }
-  wrap.classList.remove("hidden");
-  wrap.innerHTML = `<h3>Mes apports enregistrés</h3>${mine.map(c => {
-    const item = Object.values(items).find(i => i.id === c.itemId);
-    const isEditing = c.id === editingContributionId;
-    return `<article class="my-contribution-card ${isEditing ? "is-editing" : ""}">
-      <div>
-        <strong>${escapeHtml(item?.name || "Catégorie supprimée")}</strong>
-        <span>${escapeHtml(c.label || "Sans précision")}${item?.isQuantityBased ? ` · ${Number(c.quantity || 1)}` : ""}</span>
-        ${c.comment ? `<small>${escapeHtml(c.comment)}</small>` : ""}
-      </div>
-      <button type="button" class="ghost edit-contribution-btn" data-contribution-id="${escapeHtml(c.id)}">${isEditing ? "En cours" : "Modifier"}</button>
-    </article>`;
-  }).join("")}`;
-}
-
-function startContributionEdit(contributionId){
-  const contribution = contributions[contributionId];
-  if(!contribution || contribution.registrationUid !== activeRegistrationKey) return;
-  editingContributionId = contributionId;
-  renderItemSelect();
-  document.querySelectorAll("#contribItemsList input[type='checkbox']").forEach(input => {
-    input.checked = input.value === contribution.itemId;
-  });
-  $("contribLabel").value = contribution.label || "";
-  $("contribComment").value = contribution.comment || "";
-  $("contribQty").value = Number(contribution.quantity || 1);
-  $("contributionSubmitBtn").textContent = "Enregistrer la modification";
-  $("cancelContributionEdit").classList.remove("hidden");
-  updateQuantityVisibility();
-  $("contributionForm").scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function stopContributionEdit(){
-  editingContributionId = null;
-  $("contributionForm").reset();
-  $("contributionSubmitBtn").textContent = "Valider ce que j’apporte";
-  $("cancelContributionEdit").classList.add("hidden");
-  renderItemSelect();
-  renderMyContributions();
-  updateQuantityVisibility();
-}
-
-$("myContributions").addEventListener("click", e => {
-  const button = e.target.closest(".edit-contribution-btn");
-  if(button) startContributionEdit(button.dataset.contributionId);
-});
-$("cancelContributionEdit").addEventListener("click", stopContributionEdit);
 
 function renderTable(){
   const tbody = $("itemsTable"); tbody.innerHTML = "";
@@ -250,33 +185,23 @@ $("contributionForm").addEventListener("submit", async e => {
   const label = $("contribLabel").value.trim();
   const comment = $("contribComment").value.trim();
   const quantity = Number($("contribQty").value || 1);
-  const now = Date.now();
-  await Promise.all(selectedItems.map((item, index) => {
-    const isEditingExisting = editingContributionId && index === 0;
-    const contributionRef = isEditingExisting
-      ? ref(db, `contributions/${eventId}/${editingContributionId}`)
-      : push(ref(db, `contributions/${eventId}`));
-    const existingContribution = isEditingExisting ? contributions[editingContributionId] : null;
+  await Promise.all(selectedItems.map(item => {
+    const contributionRef = push(ref(db, `contributions/${eventId}`));
     return set(contributionRef, {
-      id: isEditingExisting ? editingContributionId : contributionRef.key,
-      uid: existingContribution?.uid || uid,
+      id: contributionRef.key,
+      uid,
       registrationUid: activeRegistrationKey,
       itemId:item.id,
       name: reg.name,
       label,
       quantity: item.isQuantityBased ? quantity : 1,
       comment,
-      createdAt: existingContribution?.createdAt || now,
-      updatedAt: now
+      createdAt: Date.now()
     });
   }));
-  const wasEditing = Boolean(editingContributionId);
-  editingContributionId = null;
   $("contributionForm").reset();
-  $("contributionSubmitBtn").textContent = "Valider ce que j’apporte";
-  $("cancelContributionEdit").classList.add("hidden");
   updateQuantityVisibility();
-  $("contributionFeedback").textContent = wasEditing ? "Modification enregistrée." : (selectedItems.length > 1 ? "Merci, tes apports sont enregistrés." : "Merci, ton apport est enregistré.");
+  $("contributionFeedback").textContent = selectedItems.length > 1 ? "Merci, tes apports sont enregistrés." : "Merci, ton apport est enregistré.";
 });
 
 function escapeHtml(str){ return String(str).replace(/[&<>'"]/g, s => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[s])); }
