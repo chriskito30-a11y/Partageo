@@ -83,10 +83,17 @@
         <form id="contributionForm" class="form">
           <label>Catégorie(s) à apporter<div id="contribItemsList" class="choice-list" role="group" aria-label="Catégories à apporter"></div></label>
           <label>Ce que j’apporte précisément<input id="contribLabel" required maxlength="120" placeholder="Ex. 2 quiches lorraines" /></label>
-          <label id="quantityWrap" class="hidden">Nombre apporté<input id="contribQty" type="number" min="1" max="200" value="1" /></label>
+          <div id="quantityWrap" class="hidden quantity-panel">
+            <p class="quantity-title">Quantité apportée</p>
+            <div id="quantityControls" class="quantity-controls"></div>
+          </div>
           <label>Commentaire<textarea id="contribComment" maxlength="500" placeholder="Détail utile pour éviter les doublons…"></textarea></label>
-          <button type="submit">Valider ce que j’apporte</button>
+          <div class="form-actions">
+            <button id="contributionSubmitBtn" type="submit">Valider ce que j’apporte</button>
+            <button id="cancelContributionEdit" type="button" class="ghost hidden">Annuler la modification</button>
+          </div>
         </form>
+        <div id="myContributions" class="my-contributions hidden"></div>
         <p id="contributionFeedback" class="feedback"></p>
       </article>
     </section>
