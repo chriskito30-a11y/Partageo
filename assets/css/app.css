@@ -137,3 +137,109 @@ th { background:#f8fafc;color:#4c1d95; }
 @media(max-width:760px){.module-suite-topbar{align-items:stretch;flex-direction:column}.module-suite-actions,.suite-actions{display:grid;grid-template-columns:1fr;width:100%}.suite-steps-grid,.suite-demo-screen{grid-template-columns:1fr}.ghost,button{width:100%}}
 
 .suite-demo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin-top:1rem}.suite-demo-grid .card{margin-bottom:0}@media(max-width:760px){.suite-demo-grid{grid-template-columns:1fr}}
+
+
+/* P1 contribution multi-choix : ligne entière cliquable, sans toucher à Firebase */
+.choice-list {
+  display: grid;
+  gap: .55rem;
+}
+.choice-card {
+  display: flex !important;
+  align-items: flex-start;
+  gap: .75rem;
+  width: 100%;
+  padding: .85rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.choice-card:hover {
+  border-color: #a78bfa;
+  box-shadow: 0 10px 25px rgba(124,58,237,.10);
+  transform: translateY(-1px);
+}
+.choice-card input {
+  width: 1.15rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-top: .15rem;
+  accent-color: var(--brand);
+}
+.choice-card span {
+  display: grid;
+  gap: .1rem;
+  min-width: 0;
+}
+.choice-card small {
+  color: var(--muted);
+  font-weight: 650;
+}
+.choice-card:has(input:checked) {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+  box-shadow: 0 12px 28px rgba(124,58,237,.14);
+}
+.choice-empty {
+  margin: 0;
+  padding: .85rem;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+/* P1 — modification des apports côté invité, sans modification Firebase/rules */
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+}
+.form-actions button,
+.form-actions .ghost {
+  width: auto;
+}
+.my-contributions {
+  display: grid;
+  gap: .65rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.my-contributions h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.my-contribution-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .75rem;
+  align-items: center;
+  padding: .8rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+.my-contribution-card div {
+  display: grid;
+  gap: .15rem;
+  min-width: 0;
+}
+.my-contribution-card span,
+.my-contribution-card small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.my-contribution-card.is-editing {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+}
+@media(max-width:760px){
+  .form-actions { display: grid; }
+  .form-actions button,
+  .form-actions .ghost,
+  .my-contribution-card button { width: 100%; }
+  .my-contribution-card { grid-template-columns: 1fr; }
+}
