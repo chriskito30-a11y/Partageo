@@ -85,12 +85,8 @@
           <label>Ce que j’apporte précisément<input id="contribLabel" required maxlength="120" placeholder="Ex. 2 quiches lorraines" /></label>
           <label id="quantityWrap" class="hidden">Nombre apporté<input id="contribQty" type="number" min="1" max="200" value="1" /></label>
           <label>Commentaire<textarea id="contribComment" maxlength="500" placeholder="Détail utile pour éviter les doublons…"></textarea></label>
-          <div class="form-actions">
-            <button id="contributionSubmitBtn" type="submit">Valider ce que j’apporte</button>
-            <button id="cancelContributionEdit" type="button" class="ghost hidden">Annuler la modification</button>
-          </div>
+          <button type="submit">Valider ce que j’apporte</button>
         </form>
-        <div id="myContributions" class="my-contributions hidden"></div>
         <p id="contributionFeedback" class="feedback"></p>
       </article>
     </section>
