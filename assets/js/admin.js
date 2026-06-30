@@ -84,7 +84,7 @@ function resetEventForm(){
   $("adminTables").classList.add("hidden");
 }
 function totalGuests(){ return Object.values(registrations).reduce((s,r)=>s+Number(r.guests||0),0); }
-function takenFor(item){ return Object.values(contributions).filter(c=>c.itemId===item.id).reduce((s,c)=>s+(item.isQuantityBased?Number(c.quantity||1):1),0); }
+function takenFor(item, ignoredContributionId = null){ return Object.values(contributions).filter(c=>c.itemId===item.id && c.id !== ignoredContributionId).reduce((s,c)=>s+Math.max(1, Number(c.quantity||1)),0); }
 function publicUrl(id){ return `${location.origin}${location.pathname.replace("admin.html","index.html")}?event=${id}`; }
 function adminUrl(id){ return `${location.origin}${location.pathname}?event=${id}`; }
 
@@ -240,15 +240,17 @@ function renderRegistrationsAdmin(){
     .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""), "fr"))
     .map(r=>{
       const uid = r.uid || "";
-      const userContribs = Object.values(contributions).filter(c => c.uid === uid);
+      const userContribs = Object.values(contributions).filter(c => c.registrationUid === uid || c.uid === uid);
       const contribText = userContribs.length
-        ? userContribs.map(c => `${esc(c.label || "Apport")} <span class="muted">(${esc((items[c.itemId]?.name) || c.itemId || "")})</span>`).join("<br>")
+        ? userContribs.map(c => `${esc(c.label || "Apport")} <span class="muted">(${esc((items[c.itemId]?.name) || c.itemId || "")} · ${Number(c.quantity || 1)})</span>`).join("<br>")
         : '<span class="muted">Aucun apport choisi pour le moment.</span>';
+      const editor = renderContributionAdminEditor(r, userContribs);
       return `<article class="registration-card">
         <div class="registration-main">
           <strong>${esc(r.name)}</strong> · ${Number(r.guests||0)} personne(s)
           <br><span class="muted">${esc(r.comment||"")}</span>
           <div class="contrib-summary">${contribText}</div>
+          ${editor}
         </div>
         <div class="access-code-admin">
           <label>Code accès public
@@ -260,6 +262,110 @@ function renderRegistrationsAdmin(){
       </article>`;
     }).join("");
   document.querySelectorAll("[data-save-registration-code]").forEach(btn => btn.onclick = () => saveRegistrationCode(btn.dataset.saveRegistrationCode));
+  document.querySelectorAll("[data-admin-save-contribution]").forEach(btn => btn.onclick = () => saveOrganizerContribution(btn.dataset.adminRegistrationUid, btn.dataset.adminContributionId));
+  document.querySelectorAll("[data-admin-delete-contribution]").forEach(btn => btn.onclick = () => deleteOrganizerContribution(btn.dataset.adminContributionId));
+  document.querySelectorAll("[data-admin-contribution-item]").forEach(select => select.onchange = () => updateAdminQuantityLimit(select));
+}
+
+function renderContributionAdminEditor(registration, userContribs){
+  const registrationUid = registration.uid || "";
+  const existingRows = userContribs.map(contribution => renderContributionAdminRow(registrationUid, contribution)).join("");
+  const newRow = renderContributionAdminRow(registrationUid, null);
+  return `<div class="admin-contribution-editor">
+    <h4>Modifier ce que cette personne apporte</h4>
+    ${existingRows || '<p class="muted">Aucun choix enregistré.</p>'}
+    <details class="admin-add-contribution">
+      <summary>Ajouter un apport pour cette personne</summary>
+      ${newRow}
+    </details>
+  </div>`;
+}
+
+function renderContributionAdminRow(registrationUid, contribution){
+  const contributionId = contribution?.id || "new";
+  const selectedItemId = contribution?.itemId || Object.values(items)[0]?.id || "";
+  const selectedItem = items[selectedItemId] || Object.values(items)[0] || null;
+  const remaining = selectedItem ? Math.max(1, Number(selectedItem.needed || 0) - takenFor(selectedItem, contribution?.id || null)) : 1;
+  const quantity = Math.min(Math.max(1, Number(contribution?.quantity || 1)), remaining);
+  const options = Object.values(items).map(item => {
+    const left = Math.max(0, Number(item.needed || 0) - takenFor(item, contribution?.id || null));
+    const selected = item.id === selectedItemId ? "selected" : "";
+    const disabled = left <= 0 && item.id !== selectedItemId ? "disabled" : "";
+    return `<option value="${esc(item.id)}" data-max="${Math.max(1, left)}" ${selected} ${disabled}>${esc(item.name)} — ${left} restant(s)</option>`;
+  }).join("");
+  return `<div class="admin-contribution-row" data-admin-contribution-row="${esc(contributionId)}">
+    <label>Catégorie
+      <select data-admin-contribution-item="${esc(contributionId)}">${options}</select>
+    </label>
+    <label>Précision
+      <input data-admin-contribution-label="${esc(contributionId)}" value="${esc(contribution?.label || "")}" maxlength="120" placeholder="Ex. salade, boisson, dessert…" />
+    </label>
+    <label>Quantité
+      <input data-admin-contribution-quantity="${esc(contributionId)}" type="number" min="1" max="${remaining}" value="${quantity}" inputmode="numeric" />
+    </label>
+    <label>Commentaire
+      <input data-admin-contribution-comment="${esc(contributionId)}" value="${esc(contribution?.comment || "")}" maxlength="500" placeholder="Optionnel" />
+    </label>
+    <div class="admin-contribution-actions">
+      <button type="button" class="ghost" data-admin-save-contribution="${esc(contributionId)}" data-admin-registration-uid="${esc(registrationUid)}">Enregistrer</button>
+      ${contribution ? `<button type="button" class="danger" data-admin-delete-contribution="${esc(contribution.id)}">Supprimer</button>` : ""}
+      <span class="copy-feedback" id="admin-contrib-feedback-${esc(registrationUid)}-${esc(contributionId)}"></span>
+    </div>
+  </div>`;
+}
+
+function updateAdminQuantityLimit(select){
+  const row = select.closest("[data-admin-contribution-row]");
+  const contributionId = row?.dataset.adminContributionRow || "new";
+  const option = select.selectedOptions?.[0];
+  const max = Math.max(1, Number(option?.dataset?.max || 1));
+  const qty = row?.querySelector(`[data-admin-contribution-quantity="${CSS.escape(contributionId)}"]`);
+  if(qty){
+    qty.max = String(max);
+    if(Number(qty.value || 1) > max) qty.value = String(max);
+  }
+}
+
+async function saveOrganizerContribution(registrationUid, contributionId){
+  const registration = registrations[registrationUid];
+  if(!registration){ return; }
+  const rowKey = contributionId || "new";
+  const row = document.querySelector(`[data-admin-contribution-row="${CSS.escape(rowKey)}"]`);
+  if(!row) return;
+  const itemId = row.querySelector(`[data-admin-contribution-item="${CSS.escape(rowKey)}"]`)?.value || "";
+  const item = items[itemId];
+  const label = String(row.querySelector(`[data-admin-contribution-label="${CSS.escape(rowKey)}"]`)?.value || "").trim();
+  const comment = String(row.querySelector(`[data-admin-contribution-comment="${CSS.escape(rowKey)}"]`)?.value || "").trim();
+  const quantity = Number(row.querySelector(`[data-admin-contribution-quantity="${CSS.escape(rowKey)}"]`)?.value || 1);
+  const feedback = $(`admin-contrib-feedback-${registrationUid}-${rowKey}`);
+  if(!item){ if(feedback) feedback.textContent = "Choisis une catégorie."; return; }
+  if(label.length < 2){ if(feedback) feedback.textContent = "Précision obligatoire, minimum 2 caractères."; return; }
+  const remaining = Math.max(1, Number(item.needed || 0) - takenFor(item, contributionId !== "new" ? contributionId : null));
+  if(quantity < 1 || quantity > remaining){ if(feedback) feedback.textContent = `Quantité possible : 1 à ${remaining}.`; return; }
+  const isNew = !contributionId || contributionId === "new";
+  const contributionRef = isNew ? push(ref(db, `contributions/${eventId}`)) : ref(db, `contributions/${eventId}/${contributionId}`);
+  const existing = isNew ? null : contributions[contributionId];
+  const now = Date.now();
+  await set(contributionRef, {
+    id: isNew ? contributionRef.key : contributionId,
+    uid: existing?.uid || registration.ownerAuthUid || registration.uid || registrationUid,
+    registrationUid,
+    itemId,
+    name: registration.name || "Invité",
+    label,
+    quantity,
+    comment,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    editedByOrganizerUid: currentUser?.uid || ""
+  });
+  if(feedback) feedback.textContent = "Apport enregistré.";
+}
+
+async function deleteOrganizerContribution(contributionId){
+  if(!contributionId) return;
+  if(!confirm("Supprimer cet apport ?")) return;
+  await remove(ref(db, `contributions/${eventId}/${contributionId}`));
 }
 
 async function saveRegistrationCode(uid){
