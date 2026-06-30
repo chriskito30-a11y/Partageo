@@ -283,3 +283,68 @@ th { background:#f8fafc;color:#4c1d95; }
 @media(max-width:760px){
   .quantity-control { grid-template-columns: 1fr; }
 }
+
+/* P1 — édition des apports par l'organisateur, sans modification Firebase/rules */
+.admin-contribution-editor {
+  display: grid;
+  gap: .65rem;
+  margin-top: .7rem;
+  padding-top: .7rem;
+  border-top: 1px solid var(--line);
+}
+.admin-contribution-editor h4 {
+  margin: 0;
+  color: var(--brand);
+}
+.admin-contribution-row {
+  display: grid;
+  grid-template-columns: minmax(160px,1fr) minmax(180px,1.2fr) 110px minmax(160px,1fr);
+  gap: .55rem;
+  align-items: end;
+  padding: .7rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+.admin-contribution-row label {
+  display: grid;
+  gap: .25rem;
+  font-weight: 800;
+  font-size: .9rem;
+}
+.admin-contribution-row input,
+.admin-contribution-row select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .62rem;
+  font: inherit;
+  background: white;
+}
+.admin-contribution-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  align-items: center;
+}
+.admin-add-contribution {
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  padding: .7rem;
+  background: #fffdf8;
+}
+.admin-add-contribution summary {
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--brand);
+  margin-bottom: .55rem;
+}
+@media(max-width:900px){
+  .admin-contribution-row { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width:760px){
+  .admin-contribution-row { grid-template-columns: 1fr; }
+  .admin-contribution-actions { display: grid; }
+  .admin-contribution-actions button { width: 100%; }
+}
