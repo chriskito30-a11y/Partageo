@@ -84,7 +84,17 @@ function resetEventForm(){
   $("adminTables").classList.add("hidden");
 }
 function totalGuests(){ return Object.values(registrations).reduce((s,r)=>s+Number(r.guests||0),0); }
-function takenFor(item, ignoredContributionId = null){ return Object.values(contributions).filter(c=>c.itemId===item.id && c.id !== ignoredContributionId).reduce((s,c)=>s+Math.max(1, Number(c.quantity||1)),0); }
+function contributionList(){
+  return Object.entries(contributions || {}).map(([key, value]) => {
+    const contribution = value || {};
+    return { ...contribution, id: contribution.id || key, _key: key };
+  });
+}
+function takenFor(item, ignoredContributionId = null){
+  return contributionList()
+    .filter(c => c.itemId === item.id && c.id !== ignoredContributionId && c._key !== ignoredContributionId)
+    .reduce((sum,c)=>sum+Math.max(1, Number(c.quantity||1)),0);
+}
 function publicUrl(id){ return `${location.origin}${location.pathname.replace("admin.html","index.html")}?event=${id}`; }
 function adminUrl(id){ return `${location.origin}${location.pathname}?event=${id}`; }
 
@@ -240,7 +250,7 @@ function renderRegistrationsAdmin(){
     .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""), "fr"))
     .map(r=>{
       const uid = r.uid || "";
-      const userContribs = Object.values(contributions).filter(c => c.registrationUid === uid || c.uid === uid);
+      const userContribs = contributionList().filter(c => c.registrationUid === uid || c.uid === uid);
       const contribText = userContribs.length
         ? userContribs.map(c => `${esc(c.label || "Apport")} <span class="muted">(${esc((items[c.itemId]?.name) || c.itemId || "")} · ${Number(c.quantity || 1)})</span>`).join("<br>")
         : '<span class="muted">Aucun apport choisi pour le moment.</span>';
@@ -285,13 +295,13 @@ function renderContributionAdminEditor(registration, userContribs){
 }
 
 function renderContributionAdminRow(registrationUid, contribution){
-  const contributionId = contribution?.id || "new";
+  const contributionId = contribution?._key || contribution?.id || "new";
   const selectedItemId = contribution?.itemId || Object.values(items)[0]?.id || "";
   const selectedItem = items[selectedItemId] || Object.values(items)[0] || null;
-  const remaining = selectedItem ? Math.max(1, Number(selectedItem.needed || 0) - takenFor(selectedItem, contribution?.id || null)) : 1;
+  const remaining = selectedItem ? Math.max(1, Number(selectedItem.needed || 0) - takenFor(selectedItem, contributionId !== "new" ? contributionId : null)) : 1;
   const quantity = Math.min(Math.max(1, Number(contribution?.quantity || 1)), remaining);
   const options = Object.values(items).map(item => {
-    const left = Math.max(0, Number(item.needed || 0) - takenFor(item, contribution?.id || null));
+    const left = Math.max(0, Number(item.needed || 0) - takenFor(item, contributionId !== "new" ? contributionId : null));
     const selected = item.id === selectedItemId ? "selected" : "";
     const disabled = left <= 0 && item.id !== selectedItemId ? "disabled" : "";
     return `<option value="${esc(item.id)}" data-max="${Math.max(1, left)}" ${selected} ${disabled}>${esc(item.name)} — ${left} restant(s)</option>`;
@@ -311,7 +321,7 @@ function renderContributionAdminRow(registrationUid, contribution){
     </label>
     <div class="admin-contribution-actions">
       <button type="button" class="ghost" data-admin-save-contribution="${esc(contributionId)}" data-admin-registration-uid="${esc(registrationUid)}">Enregistrer</button>
-      ${contribution ? `<button type="button" class="danger" data-admin-delete-contribution="${esc(contribution.id)}">Supprimer</button>` : ""}
+      ${contribution ? `<button type="button" class="danger" data-admin-delete-contribution="${esc(contributionId)}">Supprimer</button>` : ""}
       <span class="copy-feedback" id="admin-contrib-feedback-${esc(registrationUid)}-${esc(contributionId)}"></span>
     </div>
   </div>`;
@@ -347,12 +357,12 @@ async function saveOrganizerContribution(registrationUid, contributionId, rowEl 
   if(quantity < 1 || quantity > remaining){ if(feedback) feedback.textContent = `Quantité possible : 1 à ${remaining}.`; return; }
   const isNew = !contributionId || contributionId === "new";
   const contributionRef = isNew ? push(ref(db, `contributions/${eventId}`)) : ref(db, `contributions/${eventId}/${contributionId}`);
-  const existing = isNew ? null : contributions[contributionId];
+  const existing = isNew ? null : (contributions[contributionId] || contributionList().find(c => c.id === contributionId || c._key === contributionId) || null);
   const now = Date.now();
   try{
     if(feedback) feedback.textContent = "Enregistrement…";
     await set(contributionRef, {
-      id: isNew ? contributionRef.key : contributionId,
+      id: isNew ? contributionRef.key : (existing?.id || contributionId),
       uid: existing?.uid || registration.ownerAuthUid || registration.uid || registrationUid,
       registrationUid,
       itemId,
