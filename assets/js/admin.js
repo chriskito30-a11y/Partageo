@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { app, db, ref, get, onValue, set, update, remove } from "./firebase-config.js";
+import { app, db, ref, get, onValue, set, update, remove, push } from "./firebase-config.js";
 import { enforceModuleAccess, assertCanCreateModuleEvent, buildModuleEntityMeta, recordModuleEventUsage, isFreeLimitError, renderFreeLimitUpgrade } from "./modulys-access.js";
 import { generateItems, slugify } from "./data.js";
 
@@ -262,8 +262,11 @@ function renderRegistrationsAdmin(){
       </article>`;
     }).join("");
   document.querySelectorAll("[data-save-registration-code]").forEach(btn => btn.onclick = () => saveRegistrationCode(btn.dataset.saveRegistrationCode));
-  document.querySelectorAll("[data-admin-save-contribution]").forEach(btn => btn.onclick = () => saveOrganizerContribution(btn.dataset.adminRegistrationUid, btn.dataset.adminContributionId));
-  document.querySelectorAll("[data-admin-delete-contribution]").forEach(btn => btn.onclick = () => deleteOrganizerContribution(btn.dataset.adminContributionId));
+  document.querySelectorAll("[data-admin-save-contribution]").forEach(btn => btn.onclick = () => {
+    const row = btn.closest("[data-admin-contribution-row]");
+    saveOrganizerContribution(btn.dataset.adminRegistrationUid, btn.dataset.adminSaveContribution, row);
+  });
+  document.querySelectorAll("[data-admin-delete-contribution]").forEach(btn => btn.onclick = () => deleteOrganizerContribution(btn.dataset.adminDeleteContribution));
   document.querySelectorAll("[data-admin-contribution-item]").forEach(select => select.onchange = () => updateAdminQuantityLimit(select));
 }
 
@@ -326,18 +329,18 @@ function updateAdminQuantityLimit(select){
   }
 }
 
-async function saveOrganizerContribution(registrationUid, contributionId){
+async function saveOrganizerContribution(registrationUid, contributionId, rowEl = null){
   const registration = registrations[registrationUid];
   if(!registration){ return; }
   const rowKey = contributionId || "new";
-  const row = document.querySelector(`[data-admin-contribution-row="${CSS.escape(rowKey)}"]`);
+  const row = rowEl || document.querySelector(`[data-admin-contribution-row="${CSS.escape(rowKey)}"]`);
   if(!row) return;
   const itemId = row.querySelector(`[data-admin-contribution-item="${CSS.escape(rowKey)}"]`)?.value || "";
   const item = items[itemId];
   const label = String(row.querySelector(`[data-admin-contribution-label="${CSS.escape(rowKey)}"]`)?.value || "").trim();
   const comment = String(row.querySelector(`[data-admin-contribution-comment="${CSS.escape(rowKey)}"]`)?.value || "").trim();
   const quantity = Number(row.querySelector(`[data-admin-contribution-quantity="${CSS.escape(rowKey)}"]`)?.value || 1);
-  const feedback = $(`admin-contrib-feedback-${registrationUid}-${rowKey}`);
+  const feedback = row.querySelector(".copy-feedback") || $(`admin-contrib-feedback-${registrationUid}-${rowKey}`);
   if(!item){ if(feedback) feedback.textContent = "Choisis une catégorie."; return; }
   if(label.length < 2){ if(feedback) feedback.textContent = "Précision obligatoire, minimum 2 caractères."; return; }
   const remaining = Math.max(1, Number(item.needed || 0) - takenFor(item, contributionId !== "new" ? contributionId : null));
@@ -346,20 +349,25 @@ async function saveOrganizerContribution(registrationUid, contributionId){
   const contributionRef = isNew ? push(ref(db, `contributions/${eventId}`)) : ref(db, `contributions/${eventId}/${contributionId}`);
   const existing = isNew ? null : contributions[contributionId];
   const now = Date.now();
-  await set(contributionRef, {
-    id: isNew ? contributionRef.key : contributionId,
-    uid: existing?.uid || registration.ownerAuthUid || registration.uid || registrationUid,
-    registrationUid,
-    itemId,
-    name: registration.name || "Invité",
-    label,
-    quantity,
-    comment,
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
-    editedByOrganizerUid: currentUser?.uid || ""
-  });
-  if(feedback) feedback.textContent = "Apport enregistré.";
+  try{
+    if(feedback) feedback.textContent = "Enregistrement…";
+    await set(contributionRef, {
+      id: isNew ? contributionRef.key : contributionId,
+      uid: existing?.uid || registration.ownerAuthUid || registration.uid || registrationUid,
+      registrationUid,
+      itemId,
+      name: registration.name || "Invité",
+      label,
+      quantity,
+      comment,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+      editedByOrganizerUid: currentUser?.uid || ""
+    });
+    if(feedback) feedback.textContent = "Apport enregistré.";
+  }catch(error){
+    if(feedback) feedback.textContent = friendlyErrorMessage(error, "Impossible d’enregistrer cet apport.");
+  }
 }
 
 async function deleteOrganizerContribution(contributionId){
